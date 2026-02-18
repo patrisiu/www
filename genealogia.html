@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Genealogía</title>
+    <style>
+        :root { --azul: #d1e9ff; --rosa: #ffd1e9; --borde: #444; --accent: #2c3e50; --peligro: #e74c3c; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+        
+        .header { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
+        .titulo-app { margin: 0; flex-grow: 1; font-size: 1.5rem; color: var(--accent); }
+
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.3s; font-size: 12px; }
+        .btn-import { background: #3498db; color: white; }
+        .btn-export { background: #27ae60; color: white; }
+        .btn-danger { background: var(--peligro); color: white; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Estructura del Árbol */
+        .tree { display: flex; justify-content: center; padding-top: 20px; overflow-x: auto; }
+        .tree ul { padding-top: 20px; position: relative; display: flex; justify-content: center; }
+        .tree li { text-align: center; list-style-type: none; position: relative; padding: 20px 5px 0 5px; }
+        .tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid var(--borde); width: 50%; height: 20px; }
+        .tree li::after { right: auto; left: 50%; border-left: 2px solid var(--borde); }
+        .tree li:only-child::after, .tree li:only-child::before { display: none; }
+        .tree li:only-child { padding-top: 0; }
+        .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
+        .tree li:last-child::before { border-right: 2px solid var(--borde); border-radius: 0 5px 0 0; }
+        .tree li:first-child::after { border-radius: 5px 0 0 0; }
+        .tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--borde); width: 0; height: 20px; }
+        
+        /* Tarjetas */
+        .nodo-familia { display: inline-flex; gap: 10px; background: #fff; padding: 12px; border: 2px solid var(--borde); border-radius: 12px; position: relative; z-index: 10; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .persona { padding: 10px; border-radius: 8px; min-width: 150px; cursor: pointer; border: 1.5px solid #ccc; font-size: 13px; text-align: left; position: relative; transition: 0.2s; }
+        .persona:hover { transform: scale(1.03); z-index: 101; }
+        .persona.M { background: var(--azul); border-color: #3498db; }
+        .persona.F { background: var(--rosa); border-color: #e91e63; }
+        .persona strong { display: block; font-size: 14px; margin-bottom: 2px; }
+        .persona .loc { display: block; font-size: 10px; color: #666; font-style: italic; margin-top: 2px; }
+
+        /* Tooltip Mejorado para notas largas */
+        .persona .tooltip {
+            visibility: hidden; width: 280px; background-color: rgba(44, 62, 80, 0.98); color: #fff;
+            text-align: left; border-radius: 8px; padding: 12px; position: absolute;
+            z-index: 200; bottom: 125%; left: 50%; margin-left: -140px; opacity: 0;
+            transition: opacity 0.3s; font-size: 12px; pointer-events: none; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4); line-height: 1.4;
+            max-height: 200px; overflow-y: auto; border: 1px solid #555;
+        }
+        .persona:hover .tooltip { visibility: visible; opacity: 1; }
+
+        /* Modal */
+        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0 100px rgba(0,0,0,0.4); z-index: 1000; width: 420px; }
+        .overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; backdrop-filter: blur(2px); }
+        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .modal-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .full-width { grid-column: span 2; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1 class="titulo-app">Genealogía</h1>
+    <button class="btn btn-import" onclick="document.getElementById('fileIn').click()">Importar JSON</button>
+    <button class="btn btn-export" onclick="exportarJSON()">Copia de Seguridad</button>
+    <button class="btn btn-danger" onclick="limpiarTodo()">Borrar Árbol</button>
+    <input type="file" id="fileIn" style="display:none" onchange="importarJSON(event)">
+</div>
+
+<div class="tree" id="tree-container"></div>
+
+<div class="overlay" id="overlay" onclick="cerrarModal()"></div>
+<div id="modal">
+    <h3 style="margin:0 0 15px 0; color:var(--accent)">Ficha del Familiar</h3>
+    <input type="hidden" id="edit-id">
+    
+    <label style="font-size:12px; font-weight:bold">Nombre y Apellidos:</label>
+    <input type="text" id="edit-nombre">
+
+    <div style="display: flex; gap: 10px;">
+        <div style="flex:1">
+            <label style="font-size:12px; font-weight:bold">Nacimiento:</label>
+            <input type="text" id="edit-nac" placeholder="Año">
+        </div>
+        <div style="flex:1">
+            <label style="font-size:12px; font-weight:bold">Lugar:</label>
+            <input type="text" id="edit-lugar" placeholder="Ciudad">
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+        <div style="flex:1">
+            <label style="font-size:12px; font-weight:bold">Defunción:</label>
+            <input type="text" id="edit-def" placeholder="Año">
+        </div>
+        <div style="flex:1">
+            <label style="font-size:12px; font-weight:bold">Sexo:</label>
+            <select id="edit-sexo">
+                <option value="M">Masculino</option>
+                <option value="F">Femenino</option>
+            </select>
+        </div>
+    </div>
+
+    <label style="font-size:12px; font-weight:bold">Notas Biográficas:</label>
+    <textarea id="edit-notas" rows="4" placeholder="Copia aquí toda la frase del .gen..."></textarea>
+
+    <div class="modal-footer">
+        <button class="btn btn-export full-width" onclick="guardarCambios()">GUARDAR CAMBIOS</button>
+        <button class="btn btn-import" onclick="añadirHijo()">AÑADIR HIJO/A</button>
+        <button class="btn btn-import" id="btn-conyuge" onclick="añadirPareja()">AÑADIR PAREJA</button>
+        <button class="btn btn-danger full-width" onclick="confirmarBorrado()">ELIMINAR MIEMBRO</button>
+    </div>
+</div>
+
+<script>
+    const STORAGE_KEY = 'genealogia_v1';
+
+    window.onload = () => {
+        const guardado = localStorage.getItem(STORAGE_KEY);
+        if (guardado) { 
+            datos = JSON.parse(guardado); 
+        }
+        renderizar();
+    };
+
+    function guardarYRenderizar() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(datos));
+        renderizar();
+    }
+
+    function renderizar() {
+        const contenedor = document.getElementById('tree-container');
+        contenedor.innerHTML = '';
+        const idHijos = new Set();
+        datos.familias.forEach(f => f.hijos.forEach(id => idHijos.add(id)));
+        const familiasRaiz = datos.familias.filter(f => !idHijos.has(f.padre) && !idHijos.has(f.madre));
+        
+        const ul = document.createElement('ul');
+        if(familiasRaiz.length > 0) {
+            familiasRaiz.forEach(fam => ul.appendChild(dibujarNodoFamilia(fam)));
+        } else {
+            datos.personas.forEach(p => {
+                const li = document.createElement('li');
+                li.appendChild(crearTarjetaPersona(p));
+                ul.appendChild(li);
+            });
+        }
+        contenedor.appendChild(ul);
+    }
+
+    function dibujarNodoFamilia(fam) {
+        const li = document.createElement('li');
+        const divFam = document.createElement('div');
+        divFam.className = 'nodo-familia';
+
+        const p = datos.personas.find(x => x.id === fam.padre);
+        const m = datos.personas.find(x => x.id === fam.madre);
+
+        if(p) divFam.appendChild(crearTarjetaPersona(p));
+        if(m) divFam.appendChild(crearTarjetaPersona(m));
+        li.appendChild(divFam);
+
+        if (fam.hijos && fam.hijos.length > 0) {
+            const ulHijos = document.createElement('ul');
+            fam.hijos.forEach(hId => {
+                const subFam = datos.familias.find(f => f.padre === hId || f.madre === hId);
+                if (subFam) ulHijos.appendChild(dibujarNodoFamilia(subFam));
+                else {
+                    const hijo = datos.personas.find(x => x.id === hId);
+                    if(hijo) {
+                        const liH = document.createElement('li');
+                        liH.appendChild(crearTarjetaPersona(hijo));
+                        ulHijos.appendChild(liH);
+                    }
+                }
+            });
+            li.appendChild(ulHijos);
+        }
+        return li;
+    }
+
+    function crearTarjetaPersona(p) {
+        const div = document.createElement('div');
+        div.className = `persona ${p.sexo}`;
+        const def = p.defuncion ? ` - ${p.defuncion}` : '';
+        const lugarStr = p.lugar ? `<span class="loc">${p.lugar}</span>` : '';
+        
+        div.innerHTML = `<strong>${p.nombre}</strong><small>${p.nacimiento || '?'}${def}</small>${lugarStr}`;
+        
+        if(p.notas) {
+            const tt = document.createElement('span');
+            tt.className = 'tooltip';
+            tt.innerText = p.notas;
+            div.appendChild(tt);
+        }
+
+        div.onclick = (e) => { e.stopPropagation(); abrirModal(p.id); };
+        return div;
+    }
+
+    function abrirModal(id) {
+        const p = datos.personas.find(x => x.id === id);
+        document.getElementById('edit-id').value = id;
+        document.getElementById('edit-nombre').value = p.nombre;
+        document.getElementById('edit-sexo').value = p.sexo;
+        document.getElementById('edit-nac').value = p.nacimiento || '';
+        document.getElementById('edit-lugar').value = p.lugar || '';
+        document.getElementById('edit-def').value = p.defuncion || '';
+        document.getElementById('edit-notas').value = p.notas || '';
+        
+        const tienePareja = datos.familias.some(f => (f.padre === id && f.madre !== null) || (f.madre === id && f.padre !== null));
+        document.getElementById('btn-conyuge').style.display = tienePareja ? 'none' : 'inline-block';
+
+        document.getElementById('modal').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
+
+    function guardarCambios() {
+        const p = datos.personas.find(x => x.id === document.getElementById('edit-id').value);
+        p.nombre = document.getElementById('edit-nombre').value;
+        p.sexo = document.getElementById('edit-sexo').value;
+        p.nacimiento = document.getElementById('edit-nac').value;
+        p.lugar = document.getElementById('edit-lugar').value;
+        p.defuncion = document.getElementById('edit-def').value;
+        p.notas = document.getElementById('edit-notas').value;
+        cerrarModal(); guardarYRenderizar();
+    }
+
+    // Funciones de utilidad (Hijo, Pareja, Exportación) mantenidas de la v4...
+    function añadirHijo() {
+        const idActual = document.getElementById('edit-id').value;
+        const pActual = datos.personas.find(x => x.id === idActual);
+        let fam = datos.familias.find(f => f.padre === idActual || f.madre === idActual);
+        if(!fam) {
+            fam = { id: "F_" + Date.now(), padre: pActual.sexo === 'M' ? idActual : null, madre: pActual.sexo === 'F' ? idActual : null, hijos: [] };
+            datos.familias.push(fam);
+        }
+        const nom = prompt("Nombre del hijo/a:");
+        if(!nom) return;
+        const sexo = prompt("Sexo (M/F):", "M").toUpperCase() === 'F' ? 'F' : 'M';
+        const nuevoId = "H_" + Date.now();
+        datos.personas.push({id: nuevoId, nombre: nom, sexo: sexo, nacimiento: '', lugar: '', notas: ''});
+        fam.hijos.push(nuevoId);
+        cerrarModal(); guardarYRenderizar();
+    }
+
+    function añadirPareja() {
+        const idActual = document.getElementById('edit-id').value;
+        const pActual = datos.personas.find(x => x.id === idActual);
+        const nom = prompt("Nombre de la pareja:");
+        if(!nom) return;
+        const sexo = pActual.sexo === 'M' ? 'F' : 'M';
+        const nuevoId = "P_" + Date.now();
+        datos.personas.push({id: nuevoId, nombre: nom, sexo: sexo, nacimiento: '', lugar: '', notas: ''});
+        let fam = datos.familias.find(f => f.padre === idActual || f.madre === idActual);
+        if(fam) { if(sexo === 'M') fam.padre = nuevoId; else fam.madre = nuevoId; }
+        else { datos.familias.push({ id: "F_" + Date.now(), padre: sexo === 'M' ? nuevoId : idActual, madre: sexo === 'F' ? nuevoId : idActual, hijos: [] }); }
+        cerrarModal(); guardarYRenderizar();
+    }
+
+    function confirmarBorrado() {
+        const id = document.getElementById('edit-id').value;
+        if(confirm("¿Eliminar a este miembro?")) {
+            datos.personas = datos.personas.filter(x => x.id !== id);
+            datos.familias.forEach(f => { f.hijos = f.hijos.filter(hId => hId !== id); if(f.padre === id) f.padre = null; if(f.madre === id) f.madre = null; });
+            datos.familias = datos.familias.filter(f => f.padre !== null || f.madre !== null || f.hijos.length > 0);
+            cerrarModal(); guardarYRenderizar();
+        }
+    }
+
+    function cerrarModal() { document.getElementById('modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; }
+    function exportarJSON() {
+        const blob = new Blob([JSON.stringify(datos, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'sicilia_espuny_completo.json'; a.click();
+    }
+    function importarJSON(e) {
+        const reader = new FileReader();
+        reader.onload = (ev) => { datos = JSON.parse(ev.target.result); guardarYRenderizar(); };
+        reader.readAsText(e.target.files[0]);
+    }
+    function limpiarTodo() { if(confirm("¿Borrar todo?")) { datos = { personas: [], familias: [] }; localStorage.clear(); renderizar(); } }
+</script>
+</body>
+</html>
