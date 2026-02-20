@@ -28,48 +28,9 @@
         .tree li:last-child::before { border-right: 2px solid var(--borde); border-radius: 0 5px 0 0; }
         .tree li:first-child::after { border-radius: 5px 0 0 0; }
         .tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--borde); width: 0; height: 20px; }
-        /* Ajuste para que la línea del árbol (li::before) no tape la unión */
-        .tree li::before, .tree li::after { z-index: 1; }
 
-        /* Símbolo de Unión (+) */
-        .union-symbol {
-            width: 24px;
-            height: 24px;
-            background: white;
-            border: 2px solid var(--borde);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 16px;
-            color: var(--accent);
-            margin: 10px auto; /* Centrado debajo del descendiente */
-            position: relative;
-            z-index: 5;
-        }
-
-        /* Contenedor para la pareja al lado del símbolo */
-        .union-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        /* Línea que conecta el símbolo con la pareja */
-        .conyuge-line-short {
-            width: 15px;
-            height: 2px;
-            background: var(--borde);
-        }
-
-        /* Ajuste de tarjetas para que no se vean como un solo bloque rígido */
-        .persona {
-            margin: 0 auto;
-            display: block;
-        }
+        /* Tarjetas */
+        .nodo-familia { display: inline-flex; gap: 10px; background: #fff; padding: 12px; border: 2px solid var(--borde); border-radius: 12px; position: relative; z-index: 10; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
         .persona { padding: 10px; border-radius: 8px; min-width: 150px; cursor: pointer; border: 1.5px solid #ccc; font-size: 13px; text-align: left; position: relative; transition: 0.2s; }
         .persona:hover { transform: scale(1.03); z-index: 101; }
         .persona.M { background: var(--azul); border-color: #3498db; }
@@ -94,22 +55,6 @@
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
         .modal-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .full-width { grid-column: span 2; }
-
-        /* Contenedor infinito */
-        #tree-wrapper {
-            width: 100%;
-            height: 600px;
-            overflow: hidden;
-            cursor: grab;
-            background: #e5e7eb;
-            border-radius: 12px;
-        }
-
-        #tree-container {
-            transform-origin: 0 0;
-            transition: transform 0.1s ease-out;
-            display: inline-block;
-        }
     </style>
 </head>
 <body>
@@ -169,12 +114,31 @@
 </div>
 
 <script>
-    const STORAGE_KEY = 'genealogia_v1';
+    // DATOS ACTUALIZADOS DESDE EL GEDCOM ORIGINAL
+    let datos = {
+        personas: [
+            { id: "I1340797", nombre: "Jorge Sicilia Espuny", sexo: "M", nacimiento: "1974", lugar: "Burgos", notas: "Economista y padre de cuatro hijos. Casado con Susana." },
+            { id: "I1340737", nombre: "Carmen Espuny Domingo", sexo: "F", nacimiento: "1940", lugar: "Tortosa", notas: "Farmacéutica y madre de cinco hijos. Casada con Jesús Sicilia Yllera." },
+            { id: "I1340786", nombre: "Jesus Sicilia Yllera", sexo: "M", nacimiento: "1940", lugar: "Burgos, España", notas: "Farmacéutico y padre de cinco hijos. Casado con Carmen Espuny Domingo." },
+            { id: "I1044438", nombre: "Carmen Espuny Aleixendri", sexo: "F", nacimiento: "1890", lugar: "Vinallop", notas: "Fue maestra hasta su jubilación. Escribió una carta a todos sus hermanos comunicando su intención de casarse... Carmen comenzó los estudios en la prestigiosa “Escuela de Bibliotecarios” de Barcelona hacia 1920. No sabemos por qué, parece que el hecho de que la posibilidad de presentarse a oposiciones acabara a los 35 años y ella ya había cumplido los 30 tuvo algo que ver. Lluis-Nicolau d´Olwe le dijo “Señorita Espuny siento mucho que nos deje”. La primera plaza que ganó fue Berge (Teruel). Pronto pudo trasladarse a Bitem, al lado de Tortosa... En tiempos de la República daba clases de catalán a la gente del pueblo. Acabada la guerra y con el marido en la cárcel hasta el 42... fue el único puntal económico de la familia hasta que la hija mayor entró en Telefónica el año 43. Se jubiló con 70 años y murió a los 90 dejando una profunda huella." },
+            { id: "I1340768", nombre: "Josep Espuny Domingo", sexo: "M", nacimiento: "1943", lugar: "Tortosa", notas: "Neix a Tortosa, estudia Batxillerat a Martos i la carrera d'Aparellador a Madrid. Altra vegada a Tortosa fa de professor de Batxillerat, UNED, EGB i ESO. Ara està ja jubilat." },
+            { id: "I1340770", nombre: "Marinta Espuny Domingo", sexo: "F", nacimiento: "1954", lugar: "Tortosa", notas: "Licenciada en derecho y filosofía y letras. Profesora de la Universidad Autónoma de Barcelona. ¿Quién ha sido el gracioso que ha puesto mi edad y currículum?" },
+            { id: "I1044337", nombre: "Tomas Espuny Bonfill", sexo: "M", nacimiento: "1853", lugar: "Vinallop", notas: "Es el 7 de 8 hermanos. Carlista. Primero que cambia agricultura por industria. Se casó en Tortosa. El primer año vivían cada uno en las casa paternas, después vivieron en Vinallop y por último en Ferrerias. Murió paralítico." },
+            { id: "I1044338", nombre: "Cinta Aleixendri Bonfill", sexo: "F", nacimiento: "1857", lugar: "España", notas: "Analfabeta, su mejor virtud era la discreción y el sentido común. Muy activa, era un archivo de refranero popular. Era la tercera." }
+        ],
+        familias: [
+            { id: "F753344", padre: "I1340786", madre: "I1340737", hijos: ["I1340797"] },
+            { id: "F753318", padre: "I1340710", madre: "I1340730", hijos: ["I1340737", "I1340768", "I1340770"] },
+            { id: "F603221", padre: "I1044337", madre: "I1044338", hijos: ["I1044438"] }
+        ]
+    };
+
+    const STORAGE_KEY = 'genealogia_v4_georef';
 
     window.onload = () => {
         const guardado = localStorage.getItem(STORAGE_KEY);
-        if (guardado) { 
-            datos = JSON.parse(guardado); 
+        if (guardado) {
+            datos = JSON.parse(guardado);
         }
         renderizar();
     };
@@ -184,77 +148,53 @@
         renderizar();
     }
 
-    let familiasRenderizadas = new Set();
-
     function renderizar() {
         const contenedor = document.getElementById('tree-container');
         contenedor.innerHTML = '';
-        familiasRenderizadas.clear();
-
-        // 1. Identificar quiénes no son hijos de nadie (Raíces)
         const idHijos = new Set();
         datos.familias.forEach(f => f.hijos.forEach(id => idHijos.add(id)));
-        const personasRaiz = datos.personas.filter(p => !idHijos.has(p.id));
+        const familiasRaiz = datos.familias.filter(f => !idHijos.has(f.padre) && !idHijos.has(f.madre));
 
         const ul = document.createElement('ul');
-        personasRaiz.forEach(p => {
-            // Solo procesamos como raíz si no ha sido procesado como pareja de otro raíz
-            ul.appendChild(dibujarNodoPersona(p.id));
-        });
+        if(familiasRaiz.length > 0) {
+            familiasRaiz.forEach(fam => ul.appendChild(dibujarNodoFamilia(fam)));
+        } else {
+            datos.personas.forEach(p => {
+                const li = document.createElement('li');
+                li.appendChild(crearTarjetaPersona(p));
+                ul.appendChild(li);
+            });
+        }
         contenedor.appendChild(ul);
     }
 
-    function dibujarNodoPersona(personaId) {
-        const p = datos.personas.find(x => x.id === personaId);
-        if (!p) return document.createTextNode("");
-
+    function dibujarNodoFamilia(fam) {
         const li = document.createElement('li');
-        // La tarjeta del descendiente es el primer elemento, recibiendo la línea central
-        li.appendChild(crearTarjetaPersona(p));
+        const divFam = document.createElement('div');
+        divFam.className = 'nodo-familia';
 
-        // 2. Buscar familias donde esta persona es progenitor
-        const fams = datos.familias.filter(f => f.padre === personaId || f.madre === personaId);
+        const p = datos.personas.find(x => x.id === fam.padre);
+        const m = datos.personas.find(x => x.id === fam.madre);
 
-        if (fams.length > 0) {
-            const ulUniones = document.createElement('ul');
-            fams.forEach(fam => {
-                if (familiasRenderizadas.has(fam.id)) return;
-                familiasRenderizadas.add(fam.id);
+        if(p) divFam.appendChild(crearTarjetaPersona(p));
+        if(m) divFam.appendChild(crearTarjetaPersona(m));
+        li.appendChild(divFam);
 
-                const liUnion = document.createElement('li');
-
-                // Fila de Unión: [+] --- [Pareja]
-                const divUnionRow = document.createElement('div');
-                divUnionRow.className = 'union-row';
-
-                const simbolo = document.createElement('div');
-                simbolo.className = 'union-symbol';
-                simbolo.innerText = '+';
-                divUnionRow.appendChild(simbolo);
-
-                const partnerId = (fam.padre === personaId) ? fam.madre : fam.padre;
-                const partner = datos.personas.find(x => x.id === partnerId);
-
-                if (partner) {
-                    const conector = document.createElement('div');
-                    conector.className = 'conyuge-line-short';
-                    divUnionRow.appendChild(conector);
-                    divUnionRow.appendChild(crearTarjetaPersona(partner));
+        if (fam.hijos && fam.hijos.length > 0) {
+            const ulHijos = document.createElement('ul');
+            fam.hijos.forEach(hId => {
+                const subFam = datos.familias.find(f => f.padre === hId || f.madre === hId);
+                if (subFam) ulHijos.appendChild(dibujarNodoFamilia(subFam));
+                else {
+                    const hijo = datos.personas.find(x => x.id === hId);
+                    if(hijo) {
+                        const liH = document.createElement('li');
+                        liH.appendChild(crearTarjetaPersona(hijo));
+                        ulHijos.appendChild(liH);
+                    }
                 }
-
-                liUnion.appendChild(divUnionRow);
-
-                // 3. Renderizar hijos de esta unión específica
-                if (fam.hijos && fam.hijos.length > 0) {
-                    const ulHijos = document.createElement('ul');
-                    fam.hijos.forEach(hId => {
-                        ulHijos.appendChild(dibujarNodoPersona(hId));
-                    });
-                    liUnion.appendChild(ulHijos);
-                }
-                ulUniones.appendChild(liUnion);
             });
-            li.appendChild(ulUniones);
+            li.appendChild(ulHijos);
         }
         return li;
     }
@@ -262,10 +202,10 @@
     function crearTarjetaPersona(p) {
         const div = document.createElement('div');
         div.className = `persona ${p.sexo}`;
-        const def = p.defuncion ? ` - ${p.defuncion}` : '';
-        const lugarStr = p.lugar ? `<span class="loc">${p.lugar}</span>` : '';
-        
-        div.innerHTML = `<strong>${p.nombre}</strong><small>${p.nacimiento || '?'}${def}</small>${lugarStr}`;
+        const def = p.defuncion ? ` - † ${p.defuncion}` : '';
+        const lugarStr = p.lugar ? `<span class="loc">📍 ${p.lugar}</span>` : '';
+
+        div.innerHTML = `<strong>${p.nombre}</strong><small>n. ${p.nacimiento || '?'}${def}</small>${lugarStr}`;
         
         if(p.notas) {
             const tt = document.createElement('span');
