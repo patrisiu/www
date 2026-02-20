@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeneaGraph Pro - Navegación Estable</title>
+    <title>GeneaGraph Pro - Buscador Corregido</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         :root {
@@ -20,7 +20,7 @@
         body, html {
             margin: 0; padding: 0; width: 100vw; height: 100vh;
             overflow: hidden; background: var(--fondo);
-            font-family: 'Inter', -apple-system, sans-serif;
+            font-family: 'Inter', sans-serif;
         }
 
         /* --- UI PANEL --- */
@@ -35,12 +35,36 @@
         #finder-input {
             width: 100%; padding: 10px; border-radius: 8px;
             border: 1px solid var(--borde); outline: none; font-size: 14px;
+            box-sizing: border-box;
         }
+
+        /* Contenedor de resultados del buscador */
         #finder-results-list {
-            position: absolute; top: 100%; left: 0; right: 0;
-            background: white; border-radius: 8px; border: 1px solid var(--borde);
-            box-shadow: var(--shadow); display: none; max-height: 200px; overflow-y: auto; z-index: 110;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--borde);
+            box-shadow: var(--shadow);
+            display: none;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 1000;
+            margin-top: 5px;
         }
+
+        .finder-item {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .finder-item:hover { background: #f8fafc; }
+        .finder-item b { color: var(--texto); display: block; }
+        .finder-item span { font-size: 10px; color: #94a3b8; }
 
         .btn {
             padding: 10px 15px; border-radius: 8px; border: none;
@@ -54,7 +78,6 @@
 
         /* --- GRAPH --- */
         svg { width: 100%; height: 100%; display: block; cursor: grab; }
-        svg:active { cursor: grabbing; }
         .link { stroke: #cbd5e1; stroke-width: 1.5px; fill: none; pointer-events: none; }
         .link-family { stroke-dasharray: 4; stroke: #94a3b8; }
         .label-name { font-size: 11px; font-weight: 700; fill: var(--texto); pointer-events: none; }
@@ -63,7 +86,6 @@
             stroke: var(--highlight) !important;
             stroke-width: 5px !important;
             filter: drop-shadow(0 0 8px var(--highlight));
-            transition: all 0.3s ease;
         }
 
         /* --- INFO CARD --- */
@@ -80,10 +102,10 @@
 <body>
 
 <div class="ui-panel">
-    <div style="font-weight: 800; color: var(--accent);">GeneaGraph <span style="font-weight:300">Red</span></div>
+    <div style="font-weight: 800; color: var(--accent);">GeneaGraph <span style="font-weight:300">Pro</span></div>
 
     <div class="finder-container">
-        <input type="text" id="finder-input" placeholder="🔍 Buscar por nombre..." oninput="searchFinder()">
+        <input type="text" id="finder-input" placeholder="🔍 Buscar pariente..." oninput="searchFinder()">
         <div id="finder-results-list"></div>
     </div>
 
@@ -92,7 +114,7 @@
         <button class="btn btn-sec" onclick="exportarJSON()">💾 Exportar</button>
     </div>
     <input type="file" id="file-input" style="display:none" onchange="importarJSON(event)">
-    <a href="genealogia.html" class="btn btn-sec" style="margin-top:10px; width:100%; box-sizing:border-box;">🔙 Volver al Editor</a>
+    <a href="genealogia.html" class="btn btn-sec" style="margin-top:10px; width:100%; box-sizing:border-box;">🔙 Vista Enfoque</a>
 </div>
 
 <div id="info-card" class="info-card">
@@ -100,7 +122,7 @@
     <p id="info-fechas" style="font-size: 13px; color: var(--accent); margin: 5px 0;"></p>
     <p id="info-notas" style="font-size: 14px; color: #64748b; font-style: italic;"></p>
     <div style="margin-top: 20px; display: flex; gap: 10px;">
-        <a id="btn-editar-link" href="#" class="btn" style="flex: 1;">📝 Enfocar y Editar</a>
+        <a id="btn-editar-link" href="#" class="btn" style="flex: 1;">📝 Editar Datos</a>
         <button class="btn btn-sec" onclick="cerrarInfo()">Cerrar</button>
     </div>
 </div>
@@ -122,9 +144,7 @@
 
     window.onload = () => {
         const guardado = localStorage.getItem('genealogia_db');
-        if (guardado) {
-            datos = JSON.parse(guardado);
-        }
+        if (guardado) datos = JSON.parse(guardado);
 
         actualizarGrafo();
 
@@ -132,17 +152,14 @@
         const idQuery = urlParams.get('id');
 
         if (idQuery) {
-            // Primer enfoque rápido
-            setTimeout(() => focusNode(idQuery, 800), 400);
-            // Segundo enfoque de precisión cuando la red está quieta
-            setTimeout(() => focusNode(idQuery, 500), 1500);
+            setTimeout(() => focusNode(idQuery, 800), 500);
+            setTimeout(() => focusNode(idQuery, 500), 1800);
         }
     };
 
     function actualizarGrafo() {
         gContainer.selectAll("*").remove();
-        const w = window.innerWidth;
-        const h = window.innerHeight;
+        const w = window.innerWidth, h = window.innerHeight;
 
         const nodosFam = datos.familias.map(f => ({ id: f.id, isFamily: true }));
         const nodosPer = datos.personas.map(p => ({ ...p, isFamily: false }));
@@ -156,11 +173,13 @@
         });
 
         simulation = d3.forceSimulation(nodes)
-            .velocityDecay(0.4) // Fricción más alta para que los nodos se detengan antes
-            .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === "marriage" ? 70 : 140).strength(1))
-            .force("charge", d3.forceManyBody().strength(-1200))
+            .velocityDecay(0.4)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === "marriage" ? 60 : 150).strength(1.2))
+            .force("charge", d3.forceManyBody().strength(d => d.isFamily ? -1500 : -1000))
             .force("center", d3.forceCenter(w / 2, h / 2))
-            .force("collision", d3.forceCollide().radius(90));
+            .force("collision", d3.forceCollide().radius(d => d.isFamily ? 50 : 100));
+
+        for (let i = 0; i < 80; i++) simulation.tick();
 
         const linkElements = gContainer.append("g")
             .selectAll("path")
@@ -174,13 +193,9 @@
             .join("g")
             .attr("class", d => d.isFamily ? "node-family" : "node-person")
             .attr("id", d => "node-" + d.id)
-            .call(d3.drag()
-                .on("start", dragstarted)
-                .on("drag", dragged)
-                .on("end", dragended))
             .on("click", (e, d) => {
                 e.stopPropagation();
-                if(!d.isFamily) focusNode(d.id, 1000); // Enfoque suave al hacer clic
+                if(!d.isFamily) focusNode(d.id, 1000);
             });
 
         nodeElements.filter(d => !d.isFamily).append("rect")
@@ -194,7 +209,7 @@
             .text(d => d.nombre.length > 20 ? d.nombre.substring(0,18)+"..." : d.nombre);
 
         nodeElements.filter(d => d.isFamily).append("circle")
-            .attr("r", 8).attr("fill", "#94a3b8").attr("stroke", "white").attr("stroke-width", 2);
+            .attr("r", 10).attr("fill", "#64748b").attr("stroke", "white").attr("stroke-width", 3);
 
         simulation.on("tick", () => {
             linkElements.attr("d", d => `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`);
@@ -202,33 +217,54 @@
         });
     }
 
-    // --- ENFOQUE CON CONGELACIÓN TEMPORAL ---
+    // --- FUNCIÓN DE BÚSQUEDA CORREGIDA ---
+    function searchFinder() {
+        const query = document.getElementById('finder-input').value.toLowerCase();
+        const resultsDiv = document.getElementById('finder-results-list');
+
+        if (query.length < 2) {
+            resultsDiv.style.display = 'none';
+            resultsDiv.innerHTML = "";
+            return;
+        }
+
+        const filtered = datos.personas.filter(p => p.nombre.toLowerCase().includes(query)).slice(0, 8);
+
+        if (filtered.length > 0) {
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = filtered.map(p => `
+                <div class="finder-item" onclick="focusNode('${p.id}', 1200); clearFinder();">
+                    <b>${p.nombre}</b>
+                    <span>ID: ${p.id}</span>
+                </div>
+            `).join('');
+        } else {
+            resultsDiv.style.display = 'none';
+        }
+    }
+
+    function clearFinder() {
+        document.getElementById('finder-input').value = '';
+        document.getElementById('finder-results-list').style.display = 'none';
+    }
+
     function focusNode(id, duration = 1000) {
         const targetNode = nodes.find(n => n.id === id);
         if (!targetNode) return;
 
-        // 1. Bajamos el alpha a casi cero para que la red no se mueva durante el zoom
-        simulation.alpha(0.01).stop();
+        simulation.alpha(0).stop();
 
         const transform = d3.zoomIdentity
             .translate(window.innerWidth / 2, window.innerHeight / 2)
-            .scale(1.4)
+            .scale(1.2)
             .translate(-targetNode.x, -targetNode.y);
 
-        svg.transition()
-            .duration(duration)
-            .ease(d3.easeQuadInOut)
+        svg.transition().duration(duration).ease(d3.easeQuadInOut)
             .call(zoomBehavior.transform, transform)
-            .on("end", () => {
-                // Una vez terminado el zoom, dejamos que la red se asiente mínimamente si es necesario
-                simulation.alpha(0.01).restart();
-            });
+            .on("end", () => simulation.alpha(0.01).restart());
 
         d3.selectAll(".node-person").classed("found-node", false);
-        const nodeElement = d3.select("#node-" + id);
-        if (!nodeElement.empty()) {
-            nodeElement.classed("found-node", true);
-        }
+        d3.select("#node-" + id).classed("found-node", true);
 
         mostrarInfo(targetNode);
     }
@@ -243,38 +279,9 @@
 
     function cerrarInfo() { document.getElementById("info-card").classList.remove("active"); }
 
-    function searchFinder() {
-        const query = document.getElementById('finder-input').value.toLowerCase();
-        const resultsDiv = document.getElementById('finder-results-list');
-        if (query.length < 2) { resultsDiv.innerHTML = ""; resultsDiv.style.display='none'; return; }
-
-        const filtered = datos.personas.filter(p => p.nombre.toLowerCase().includes(query)).slice(0, 5);
-        if (filtered.length > 0) {
-            resultsDiv.style.display = 'block';
-            resultsDiv.innerHTML = filtered.map(p => `
-                <div class="finder-item" style="padding:10px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:13px;"
-                     onclick="focusNode('${p.id}'); clearFinder();">
-                    <b>${p.nombre}</b> <span style="font-size:10px; color:#94a3b8;">[${p.id}]</span>
-                </div>
-            `).join('');
-        } else {
-            resultsDiv.style.display='none';
-        }
-    }
-
-    function clearFinder() {
-        document.getElementById('finder-input').value = '';
-        document.getElementById('finder-results-list').style.display = 'none';
-    }
-
-    function dragstarted(event, d) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x; d.fy = d.y;
-    }
-    function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
-    function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null; d.fy = null;
+    function exportarJSON() {
+        const blob = new Blob([JSON.stringify(datos, null, 2)], {type: 'application/json'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'arbol_grafo.json'; a.click();
     }
 
     function importarJSON(e) {
@@ -287,10 +294,10 @@
         reader.readAsText(e.target.files[0]);
     }
 
-    function exportarJSON() {
-        const blob = new Blob([JSON.stringify(datos, null, 2)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'arbol_grafo.json'; a.click();
-    }
+    // Cerrar resultados si se hace clic fuera del buscador
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.finder-container')) clearFinder();
+    });
 
     svg.on("click", () => cerrarInfo());
 </script>
