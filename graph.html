@@ -130,15 +130,20 @@
 
         actualizarGrafo();
 
-        // PROCESAMIENTO PARÁMETRO URL ?id=...
         const urlParams = new URLSearchParams(window.location.search);
         const idQuery = urlParams.get('id');
 
         if (idQuery) {
-            // Esperamos a que la simulación asigne coordenadas iniciales
+            // Primer intento: cuando los nodos aparecen
             setTimeout(() => {
-                focusNode(idQuery);
-            }, 400);
+                focusNode(idQuery, 800); // Duración de transición 800ms
+            }, 500);
+
+            // Segundo intento: Refuerzo cuando el grafo ya se ha asentado
+            // Escuchamos el evento 'end' de la simulación o usamos un delay largo
+            setTimeout(() => {
+                focusNode(idQuery, 500); // Un ajuste fino y rápido
+            }, 2000);
         }
     };
 
@@ -205,21 +210,29 @@
     }
 
     // --- LÓGICA DE NAVEGACIÓN POR ID ---
-    function focusNode(id) {
+    function focusNode(id, duration = 1000) {
         const targetNode = nodes.find(n => n.id === id);
         if (!targetNode) return;
 
-        // Centrado dinámico
+        // IMPORTANTE: Si la simulación aún es muy activa, los nodos se mueven.
+        // Bajamos el 'alpha' para que los nodos se queden quietos mientras centramos.
+        if (simulation) simulation.alpha(0.1);
+
         const transform = d3.zoomIdentity
-            .translate(window.innerWidth/2, window.innerHeight/2)
+            .translate(window.innerWidth / 2, window.innerHeight / 2)
             .scale(1.4)
             .translate(-targetNode.x, -targetNode.y);
 
-        svg.transition().duration(1000).ease(d3.easeCubicOut).call(zoomBehavior.transform, transform);
+        svg.transition()
+            .duration(duration)
+            .ease(d3.easeQuadInOut)
+            .call(zoomBehavior.transform, transform);
 
-        // Resaltado de borde
         d3.selectAll(".node-person").classed("found-node", false);
-        d3.select("#node-" + id).classed("found-node", true);
+        const nodeElement = d3.select("#node-" + id);
+        if (!nodeElement.empty()) {
+            nodeElement.classed("found-node", true);
+        }
 
         mostrarInfo(targetNode);
     }
