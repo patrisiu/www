@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeneaGraph Pro - Buscador Corregido</title>
+    <title>GeneaGraph Pro - Navegación e Interacción</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         :root {
@@ -23,7 +23,6 @@
             font-family: 'Inter', sans-serif;
         }
 
-        /* --- UI PANEL --- */
         .ui-panel {
             position: absolute; top: 20px; left: 20px; z-index: 100;
             background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
@@ -38,21 +37,11 @@
             box-sizing: border-box;
         }
 
-        /* Contenedor de resultados del buscador */
         #finder-results-list {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--borde);
-            box-shadow: var(--shadow);
-            display: none;
-            max-height: 250px;
-            overflow-y: auto;
-            z-index: 1000;
-            margin-top: 5px;
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: white; border-radius: 8px; border: 1px solid var(--borde);
+            box-shadow: var(--shadow); display: none; max-height: 250px;
+            overflow-y: auto; z-index: 1000; margin-top: 5px;
         }
 
         .finder-item {
@@ -76,8 +65,8 @@
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-sec { background: #f1f5f9; color: var(--texto); border: 1px solid var(--borde); }
 
-        /* --- GRAPH --- */
         svg { width: 100%; height: 100%; display: block; cursor: grab; }
+        svg:active { cursor: grabbing; }
         .link { stroke: #cbd5e1; stroke-width: 1.5px; fill: none; pointer-events: none; }
         .link-family { stroke-dasharray: 4; stroke: #94a3b8; }
         .label-name { font-size: 11px; font-weight: 700; fill: var(--texto); pointer-events: none; }
@@ -88,7 +77,6 @@
             filter: drop-shadow(0 0 8px var(--highlight));
         }
 
-        /* --- INFO CARD --- */
         .info-card {
             position: fixed; bottom: 30px; right: 30px; width: 320px;
             background: white; border-radius: 20px; padding: 25px;
@@ -145,12 +133,10 @@
     window.onload = () => {
         const guardado = localStorage.getItem('genealogia_db');
         if (guardado) datos = JSON.parse(guardado);
-
         actualizarGrafo();
 
         const urlParams = new URLSearchParams(window.location.search);
         const idQuery = urlParams.get('id');
-
         if (idQuery) {
             setTimeout(() => focusNode(idQuery, 800), 500);
             setTimeout(() => focusNode(idQuery, 500), 1800);
@@ -179,6 +165,7 @@
             .force("center", d3.forceCenter(w / 2, h / 2))
             .force("collision", d3.forceCollide().radius(d => d.isFamily ? 50 : 100));
 
+        // Warm-up inicial
         for (let i = 0; i < 80; i++) simulation.tick();
 
         const linkElements = gContainer.append("g")
@@ -193,6 +180,10 @@
             .join("g")
             .attr("class", d => d.isFamily ? "node-family" : "node-person")
             .attr("id", d => "node-" + d.id)
+            .call(d3.drag() // RESTAURADO EL ARRASTRE
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
             .on("click", (e, d) => {
                 e.stopPropagation();
                 if(!d.isFamily) focusNode(d.id, 1000);
@@ -217,42 +208,25 @@
         });
     }
 
-    // --- FUNCIÓN DE BÚSQUEDA CORREGIDA ---
-    function searchFinder() {
-        const query = document.getElementById('finder-input').value.toLowerCase();
-        const resultsDiv = document.getElementById('finder-results-list');
-
-        if (query.length < 2) {
-            resultsDiv.style.display = 'none';
-            resultsDiv.innerHTML = "";
-            return;
-        }
-
-        const filtered = datos.personas.filter(p => p.nombre.toLowerCase().includes(query)).slice(0, 8);
-
-        if (filtered.length > 0) {
-            resultsDiv.style.display = 'block';
-            resultsDiv.innerHTML = filtered.map(p => `
-                <div class="finder-item" onclick="focusNode('${p.id}', 1200); clearFinder();">
-                    <b>${p.nombre}</b>
-                    <span>ID: ${p.id}</span>
-                </div>
-            `).join('');
-        } else {
-            resultsDiv.style.display = 'none';
-        }
+    // --- FUNCIONES DE ARRASTRE (CORREGIDAS) ---
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x; d.fy = d.y;
     }
-
-    function clearFinder() {
-        document.getElementById('finder-input').value = '';
-        document.getElementById('finder-results-list').style.display = 'none';
+    function dragged(event, d) {
+        d.fx = event.x; d.fy = event.y;
+    }
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null; d.fy = null;
     }
 
     function focusNode(id, duration = 1000) {
         const targetNode = nodes.find(n => n.id === id);
         if (!targetNode) return;
 
-        simulation.alpha(0).stop();
+        // Detenemos temporalmente el "ruido" físico para precisión del zoom
+        simulation.alpha(0);
 
         const transform = d3.zoomIdentity
             .translate(window.innerWidth / 2, window.innerHeight / 2)
@@ -261,12 +235,35 @@
 
         svg.transition().duration(duration).ease(d3.easeQuadInOut)
             .call(zoomBehavior.transform, transform)
-            .on("end", () => simulation.alpha(0.01).restart());
+            .on("end", () => {
+                // Reiniciamos con energía muy baja para permitir arrastre inmediato
+                simulation.alpha(0.01).restart();
+            });
 
         d3.selectAll(".node-person").classed("found-node", false);
         d3.select("#node-" + id).classed("found-node", true);
-
         mostrarInfo(targetNode);
+    }
+
+    // --- FINDER Y RESTO DE FUNCIONES ---
+    function searchFinder() {
+        const query = document.getElementById('finder-input').value.toLowerCase();
+        const resultsDiv = document.getElementById('finder-results-list');
+        if (query.length < 2) { resultsDiv.style.display = 'none'; return; }
+        const filtered = datos.personas.filter(p => p.nombre.toLowerCase().includes(query)).slice(0, 8);
+        if (filtered.length > 0) {
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = filtered.map(p => `
+                <div class="finder-item" onclick="focusNode('${p.id}', 1200); clearFinder();">
+                    <b>${p.nombre}</b><span>ID: ${p.id}</span>
+                </div>
+            `).join('');
+        } else resultsDiv.style.display = 'none';
+    }
+
+    function clearFinder() {
+        document.getElementById('finder-input').value = '';
+        document.getElementById('finder-results-list').style.display = 'none';
     }
 
     function mostrarInfo(d) {
@@ -294,11 +291,7 @@
         reader.readAsText(e.target.files[0]);
     }
 
-    // Cerrar resultados si se hace clic fuera del buscador
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.finder-container')) clearFinder();
-    });
-
+    document.addEventListener('click', (e) => { if (!e.target.closest('.finder-container')) clearFinder(); });
     svg.on("click", () => cerrarInfo());
 </script>
 </body>
