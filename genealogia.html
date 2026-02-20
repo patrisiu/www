@@ -59,6 +59,23 @@
         .res-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
         .res-item:hover { background: #f8fafc; color: var(--accent); }
 
+        /* --- BOTÓN RETORNO AL GRAFO (NUEVO) --- */
+        .btn-grafo {
+            text-decoration: none;
+            background: #e2e8f0;
+            color: var(--texto-principal);
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+            border: 1px solid var(--borde);
+        }
+        .btn-grafo:hover { background: #cbd5e1; transform: translateY(-1px); }
+
         /* --- ARBOL --- */
         #tree-container {
             display: flex; flex-direction: column; align-items: center; gap: 45px; padding: 60px 20px;
@@ -120,7 +137,10 @@
 <body>
 
 <header class="header">
-    <h2 style="margin:0; font-size: 1.2rem; font-weight: 700; color: var(--accent);">GeneaEditor <span style="font-weight: 300; opacity: 0.7;">Pro</span></h2>
+    <div style="display: flex; align-items: center; gap: 15px;">
+        <a id="btn-retorno-grafo" href="graph.html" class="btn-grafo">🌐 Vista Grafo</a>
+        <h2 style="margin:0; font-size: 1.2rem; font-weight: 700; color: var(--accent);">GeneaEditor <span style="font-weight: 300; opacity: 0.7;">Pro</span></h2>
+    </div>
     <div class="search-container">
         <input type="text" id="buscador" placeholder="Buscar pariente..." oninput="filtrarBusqueda()">
         <div id="resultados-busqueda"></div>
@@ -194,16 +214,38 @@
     window.addEventListener('DOMContentLoaded', () => {
         const guardado = localStorage.getItem('genealogia_db');
         const ultimoId = localStorage.getItem('genealogia_last_id');
+
         if (guardado) {
             datos = JSON.parse(guardado);
-            idEnfoque = ultimoId || (datos.personas.length > 0 ? datos.personas[0].id : null);
+
+            // LÓGICA DE DETECCIÓN DE ID POR URL (GET)
+            const urlParams = new URLSearchParams(window.location.search);
+            const idUrl = urlParams.get('id');
+
+            // Si hay ID en URL y existe en los datos, lo usamos. Si no, usamos el último o el primero.
+            if (idUrl && datos.personas.some(p => p.id === idUrl)) {
+                idEnfoque = idUrl;
+            } else {
+                idEnfoque = ultimoId || (datos.personas.length > 0 ? datos.personas[0].id : null);
+            }
+
+            actualizarBotonGrafo(idEnfoque);
             renderizar();
         }
     });
 
+    // Función para actualizar la URL del botón de retorno al grafo
+    function actualizarBotonGrafo(id) {
+        const btn = document.getElementById('btn-retorno-grafo');
+        if (id) {
+            btn.href = `graph.html?id=${id}`;
+        }
+    }
+
     function persistir() {
         localStorage.setItem('genealogia_db', JSON.stringify(datos));
         localStorage.setItem('genealogia_last_id', idEnfoque);
+        actualizarBotonGrafo(idEnfoque);
     }
 
     function renderizar() {
@@ -213,6 +255,9 @@
         if (!idEnfoque) idEnfoque = datos.personas[0].id;
         const pPrincipal = datos.personas.find(p => p.id === idEnfoque);
         if (!pPrincipal) { idEnfoque = datos.personas[0].id; renderizar(); return; }
+
+        // Actualizamos el enlace del grafo cada vez que el enfoque cambia
+        actualizarBotonGrafo(idEnfoque);
 
         // 1. PADRES
         const divPadres = document.createElement('div');
@@ -282,11 +327,12 @@
         div.className = `persona ${p.sexo}`;
         const fDisplay = p.defuncion ? `${p.nacimiento || '?'} - ${p.defuncion}` : (p.nacimiento || '---');
         div.innerHTML = `<span class="nombre">${p.nombre}</span><span class="fechas">${fDisplay}</span>`;
-        div.onclick = () => { idEnfoque = id; renderizar(); window.scrollTo({top:0, behavior:'smooth'}); };
+        div.onclick = () => { idEnfoque = id; persistir(); renderizar(); window.scrollTo({top:0, behavior:'smooth'}); };
         wrap.appendChild(div);
         return wrap;
     }
 
+    // Funciones de modal, búsqueda e importación permanecen iguales
     function abrirModalEdicion() {
         const p = datos.personas.find(x => x.id === idEnfoque);
         modoModal = 'EDITAR';
@@ -382,7 +428,7 @@
         } else { res.style.display = 'none'; }
     }
 
-    function saltarA(id) { idEnfoque = id; document.getElementById('buscador').value = ''; document.getElementById('resultados-busqueda').style.display = 'none'; renderizar(); }
+    function saltarA(id) { idEnfoque = id; document.getElementById('buscador').value = ''; document.getElementById('resultados-busqueda').style.display = 'none'; persistir(); renderizar(); }
 
     function importarJSON(e) {
         const reader = new FileReader();
