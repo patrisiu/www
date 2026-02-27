@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeneaGraph Pro - Dual View</title>
+    <title>GeneaGraph Pro - Dual View Fixed</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         :root {
@@ -103,7 +103,7 @@
         <button class="btn btn-sec" onclick="exportarJSON()">💾 Exportar</button>
     </div>
     <input type="file" id="file-input" style="display:none" onchange="importarJSON(event)">
-    <a href="genealogia.html" class="btn btn-sec" style="margin-top:10px; width:100%; box-sizing:border-box;">🔙 Vista Enfoque</a>
+    <a id="btn-back-editor" href="genealogia.html" class="btn btn-sec" style="margin-top:10px; width:100%; box-sizing:border-box;">🔙 Vista Enfoque</a>
 </div>
 
 <div id="info-card" class="info-card">
@@ -111,7 +111,7 @@
     <p id="info-fechas" style="font-size: 13px; color: #64748b; margin: 5px 0;"></p>
     <p id="info-notas" style="font-size: 14px; color: #64748b; font-style: italic;"></p>
     <div style="margin-top: 20px; display: flex; gap: 10px;">
-        <a id="btn-editar-link" href="#" class="btn" style="flex: 1;">📝 Editar Datos</a>
+        <a id="btn-editar-link" href="genealogia.html" class="btn" style="flex: 1;">📝 Editar Datos</a>
         <button class="btn btn-sec" onclick="cerrarInfo()">Cerrar</button>
     </div>
 </div>
@@ -120,8 +120,8 @@
 
 <script>
     let datos = { personas: [], familias: [] };
-    let viewMode = 'hierarchy'; // 'free' o 'hierarchy'
-    let activeNodeId = null; // RASTREO DE NODO SELECCIONADO
+    let viewMode = 'hierarchy';
+    let activeNodeId = null;
     const svg = d3.select("#graph-canvas");
     const gContainer = svg.append("g");
 
@@ -140,7 +140,9 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const idQuery = urlParams.get('id');
-        if (idQuery) setTimeout(() => focusNode(idQuery, 800), 500);
+        if (idQuery) {
+            setTimeout(() => focusNode(idQuery, 800), 500);
+        }
     };
 
     function calcularNiveles() {
@@ -165,8 +167,6 @@
         viewMode = (viewMode === 'free') ? 'hierarchy' : 'free';
         document.getElementById('view-toggle').innerText = `Vista: ${viewMode === 'free' ? 'Libre' : 'Jerárquica'}`;
         actualizarGrafo();
-
-        // RE-ENFOCAR SI HAY NODO SELECCIONADO
         if (activeNodeId) {
             setTimeout(() => focusNode(activeNodeId, 500), 200);
         }
@@ -258,7 +258,6 @@
             nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
         });
 
-        // RE-APLICAR RESALTADO SI HAY NODO ACTIVO
         if (activeNodeId) {
             d3.select("#node-" + activeNodeId).classed("found-node", true);
         }
@@ -278,7 +277,7 @@
         const targetNode = nodes.find(n => n.id === id);
         if (!targetNode) return;
 
-        activeNodeId = id; // ACTUALIZAR NODO ACTIVO
+        activeNodeId = id;
 
         simulation.alpha(0);
         const transform = d3.zoomIdentity.translate(window.innerWidth/2, window.innerHeight/2).scale(1.2).translate(-targetNode.x, -targetNode.y);
@@ -310,14 +309,21 @@
         document.getElementById("info-nombre").innerText = d.nombre;
         document.getElementById("info-fechas").innerText = (d.nacimiento || "?") + " - " + (d.defuncion || "");
         document.getElementById("info-notas").innerText = d.notas || "";
-        document.getElementById("btn-editar-link").href = `genealogia.html?id=${d.id}`;
+
+        // CORRECCIÓN AQUÍ: Actualizar el href con el ID actual
+        const editLink = `genealogia.html?id=${d.id}`;
+        document.getElementById("btn-editar-link").href = editLink;
+        document.getElementById("btn-back-editor").href = editLink;
+
         document.getElementById("info-card").classList.add("active");
     }
 
     function cerrarInfo() {
         document.getElementById("info-card").classList.remove("active");
-        activeNodeId = null; // LIMPIAR NODO ACTIVO
+        activeNodeId = null;
         d3.selectAll(".node-person").classed("found-node", false);
+        // Restablecer el botón de vuelta al editor sin ID si no hay nada seleccionado
+        document.getElementById("btn-back-editor").href = "genealogia.html";
     }
 
     function exportarJSON() {
