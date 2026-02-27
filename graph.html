@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeneaGraph Pro - Navegación e Interacción</title>
+    <title>GeneaGraph Pro - Dual View</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         :root {
             --fondo: #f8fafc;
             --texto: #334155;
             --accent: #475569;
-            --m-color: #93c5fd;
-            --f-color: #f9a8d4;
             --borde: #e2e8f0;
             --shadow: 0 10px 25px rgba(0,0,0,0.1);
             --highlight: #fbbf24;
@@ -23,6 +21,7 @@
             font-family: 'Inter', sans-serif;
         }
 
+        /* UI PANEL */
         .ui-panel {
             position: absolute; top: 20px; left: 20px; z-index: 100;
             background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
@@ -45,11 +44,8 @@
         }
 
         .finder-item {
-            padding: 12px;
-            cursor: pointer;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: 13px;
-            transition: background 0.2s;
+            padding: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+            font-size: 13px; transition: background 0.2s;
         }
         .finder-item:hover { background: #f8fafc; }
         .finder-item b { color: var(--texto); display: block; }
@@ -64,7 +60,9 @@
         }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-sec { background: #f1f5f9; color: var(--texto); border: 1px solid var(--borde); }
+        .btn-toggle { background: #10b981; margin-bottom: 10px; width: 100%; }
 
+        /* GRAPH ELEMENTS */
         svg { width: 100%; height: 100%; display: block; cursor: grab; }
         svg:active { cursor: grabbing; }
         .link { stroke: #cbd5e1; stroke-width: 1.5px; fill: none; pointer-events: none; }
@@ -77,6 +75,7 @@
             filter: drop-shadow(0 0 8px var(--highlight));
         }
 
+        /* INFO CARD */
         .info-card {
             position: fixed; bottom: 30px; right: 30px; width: 320px;
             background: white; border-radius: 20px; padding: 25px;
@@ -90,7 +89,9 @@
 <body>
 
 <div class="ui-panel">
-    <div style="font-weight: 800; color: var(--accent);">GeneaGraph <span style="font-weight:300">Pro</span></div>
+    <div style="font-weight: 800; color: var(--accent); margin-bottom:15px;">GeneaGraph <span style="font-weight:300">Pro</span></div>
+    
+    <button id="view-toggle" class="btn btn-toggle" onclick="toggleView()">Vista: Jerárquica</button>
 
     <div class="finder-container">
         <input type="text" id="finder-input" placeholder="🔍 Buscar pariente..." oninput="searchFinder()">
@@ -119,11 +120,12 @@
 
 <script>
     let datos = { personas: [], familias: [] };
+    let viewMode = 'hierarchy'; // 'free' o 'hierarchy'
     const svg = d3.select("#graph-canvas");
     const gContainer = svg.append("g");
 
     const zoomBehavior = d3.zoom()
-        .scaleExtent([0.05, 3])
+        .scaleExtent([0.02, 4])
         .on("zoom", (e) => gContainer.attr("transform", e.transform));
 
     svg.call(zoomBehavior);
@@ -137,20 +139,49 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const idQuery = urlParams.get('id');
-        if (idQuery) {
-            setTimeout(() => focusNode(idQuery, 800), 500);
-            setTimeout(() => focusNode(idQuery, 500), 1800);
-        }
+        if (idQuery) setTimeout(() => focusNode(idQuery, 800), 500);
     };
+
+    function calcularNiveles() {
+        const niveles = {};
+        datos.personas.forEach(p => niveles[p.id] = 0);
+        let cambio = true;
+        for(let i=0; i<50 && cambio; i++) {
+            cambio = false;
+            datos.familias.forEach(f => {
+                const nP = f.padre ? niveles[f.padre] : 0;
+                const nM = f.madre ? niveles[f.madre] : 0;
+                const maxP = Math.max(nP, nM);
+                f.hijos.forEach(hId => {
+                    if (niveles[hId] <= maxP) { niveles[hId] = maxP + 1; cambio = true; }
+                });
+            });
+        }
+        return niveles;
+    }
+
+    function toggleView() {
+        viewMode = (viewMode === 'free') ? 'hierarchy' : 'free';
+        document.getElementById('view-toggle').innerText = `Vista: ${viewMode === 'free' ? 'Libre' : 'Jerárquica'}`;
+        actualizarGrafo();
+    }
 
     function actualizarGrafo() {
         gContainer.selectAll("*").remove();
         const w = window.innerWidth, h = window.innerHeight;
+        const nivelesMap = calcularNiveles();
 
-        const nodosFam = datos.familias.map(f => ({ id: f.id, isFamily: true }));
-        const nodosPer = datos.personas.map(p => ({ ...p, isFamily: false }));
+        const nodosFam = datos.familias.map(f => {
+            const nP = f.padre ? nivelesMap[f.padre] : 0;
+            const nM = f.madre ? nivelesMap[f.madre] : 0;
+            return { id: f.id, isFamily: true, level: Math.max(nP, nM) + 0.35 };
+        });
+
+        const nodosPer = datos.personas.map(p => ({ 
+            ...p, isFamily: false, level: nivelesMap[p.id] || 0 
+        }));
+
         nodes = [...nodosPer, ...nodosFam];
-
         links = [];
         datos.familias.forEach(f => {
             if(f.padre) links.push({ source: f.padre, target: f.id, type: "marriage" });
@@ -158,15 +189,29 @@
             f.hijos.forEach(hId => links.push({ source: f.id, target: hId, type: "child" }));
         });
 
-        simulation = d3.forceSimulation(nodes)
-            .velocityDecay(0.4)
-            .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === "marriage" ? 60 : 150).strength(1.2))
-            .force("charge", d3.forceManyBody().strength(d => d.isFamily ? -1500 : -1000))
-            .force("center", d3.forceCenter(w / 2, h / 2))
-            .force("collision", d3.forceCollide().radius(d => d.isFamily ? 50 : 100));
+        simulation = d3.forceSimulation(nodes).velocityDecay(0.4);
+
+        if (viewMode === 'free') {
+            // MODO LIBRE (Original de graph.html)
+            simulation
+                .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === "marriage" ? 60 : 150).strength(1.2))
+                .force("charge", d3.forceManyBody().strength(d => d.isFamily ? -1500 : -1000))
+                .force("center", d3.forceCenter(w / 2, h / 2))
+                .force("collision", d3.forceCollide().radius(d => d.isFamily ? 50 : 100));
+        } else {
+            // MODO JERÁRQUICO (Cascada agrupada)
+            const generacionHeight = 320;
+            simulation
+                .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === "marriage" ? 50 : 90).strength(2.5))
+                .force("charge", d3.forceManyBody().strength(-5000))
+                .force("x", d3.forceX(w/2).strength(0.02))
+                .force("y", d3.forceY(d => 100 + (d.level * generacionHeight)).strength(5))
+                .force("collision", d3.forceCollide().radius(d => d.isFamily ? 40 : 160));
+        }
 
         // Warm-up inicial
-        for (let i = 0; i < 80; i++) simulation.tick();
+        const iteraciones = viewMode === 'free' ? 80 : 300;
+        for (let i = 0; i < iteraciones; i++) simulation.tick();
 
         const linkElements = gContainer.append("g")
             .selectAll("path")
@@ -180,7 +225,7 @@
             .join("g")
             .attr("class", d => d.isFamily ? "node-family" : "node-person")
             .attr("id", d => "node-" + d.id)
-            .call(d3.drag() // RESTAURADO EL ARRASTRE
+            .call(d3.drag()
                 .on("start", dragstarted)
                 .on("drag", dragged)
                 .on("end", dragended))
@@ -208,14 +253,11 @@
         });
     }
 
-    // --- FUNCIONES DE ARRASTRE (CORREGIDAS) ---
     function dragstarted(event, d) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
         d.fx = d.x; d.fy = d.y;
     }
-    function dragged(event, d) {
-        d.fx = event.x; d.fy = event.y;
-    }
+    function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
     function dragended(event, d) {
         if (!event.active) simulation.alphaTarget(0);
         d.fx = null; d.fy = null;
@@ -224,28 +266,14 @@
     function focusNode(id, duration = 1000) {
         const targetNode = nodes.find(n => n.id === id);
         if (!targetNode) return;
-
-        // Detenemos temporalmente el "ruido" físico para precisión del zoom
         simulation.alpha(0);
-
-        const transform = d3.zoomIdentity
-            .translate(window.innerWidth / 2, window.innerHeight / 2)
-            .scale(1.2)
-            .translate(-targetNode.x, -targetNode.y);
-
-        svg.transition().duration(duration).ease(d3.easeQuadInOut)
-            .call(zoomBehavior.transform, transform)
-            .on("end", () => {
-                // Reiniciamos con energía muy baja para permitir arrastre inmediato
-                simulation.alpha(0.01).restart();
-            });
-
+        const transform = d3.zoomIdentity.translate(window.innerWidth/2, window.innerHeight/2).scale(1.2).translate(-targetNode.x, -targetNode.y);
+        svg.transition().duration(duration).ease(d3.easeQuadInOut).call(zoomBehavior.transform, transform).on("end", () => simulation.alpha(0.01).restart());
         d3.selectAll(".node-person").classed("found-node", false);
         d3.select("#node-" + id).classed("found-node", true);
         mostrarInfo(targetNode);
     }
 
-    // --- FINDER Y RESTO DE FUNCIONES ---
     function searchFinder() {
         const query = document.getElementById('finder-input').value.toLowerCase();
         const resultsDiv = document.getElementById('finder-results-list');
@@ -261,10 +289,7 @@
         } else resultsDiv.style.display = 'none';
     }
 
-    function clearFinder() {
-        document.getElementById('finder-input').value = '';
-        document.getElementById('finder-results-list').style.display = 'none';
-    }
+    function clearFinder() { document.getElementById('finder-input').value = ''; document.getElementById('finder-results-list').style.display = 'none'; }
 
     function mostrarInfo(d) {
         document.getElementById("info-nombre").innerText = d.nombre;
@@ -278,7 +303,7 @@
 
     function exportarJSON() {
         const blob = new Blob([JSON.stringify(datos, null, 2)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'arbol_grafo.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'arbol_genealogico.json'; a.click();
     }
 
     function importarJSON(e) {
