@@ -65,8 +65,8 @@
         /* GRAPH ELEMENTS */
         svg { width: 100%; height: 100%; display: block; cursor: grab; }
         svg:active { cursor: grabbing; }
-        .link { stroke: #cbd5e1; stroke-width: 1.5px; fill: none; pointer-events: none; }
-        .link-family { stroke-dasharray: 4; stroke: #94a3b8; }
+        .link { stroke: #94a3b8; stroke-width: 2px; fill: none; pointer-events: none; }
+        .link-family { stroke-dasharray: 5, 5; stroke: #cbd5e1; }
         .label-name { font-size: 11px; font-weight: 700; fill: var(--texto); pointer-events: none; }
 
         .found-node rect {
@@ -90,7 +90,7 @@
 
 <div class="ui-panel">
     <div style="font-weight: 800; color: var(--accent); margin-bottom:15px;">GeneaGraph <span style="font-weight:300">Pro</span></div>
-    
+
     <button id="view-toggle" class="btn btn-toggle" onclick="toggleView()">Vista: Jerárquica</button>
 
     <div class="finder-container">
@@ -108,7 +108,7 @@
 
 <div id="info-card" class="info-card">
     <h3 id="info-nombre" style="margin:0">Nombre</h3>
-    <p id="info-fechas" style="font-size: 13px; color: var(--accent); margin: 5px 0;"></p>
+    <p id="info-fechas" style="font-size: 13px; color: #64748b; margin: 5px 0;"></p>
     <p id="info-notas" style="font-size: 14px; color: #64748b; font-style: italic;"></p>
     <div style="margin-top: 20px; display: flex; gap: 10px;">
         <a id="btn-editar-link" href="#" class="btn" style="flex: 1;">📝 Editar Datos</a>
@@ -174,11 +174,12 @@
         const nodosFam = datos.familias.map(f => {
             const nP = f.padre ? nivelesMap[f.padre] : 0;
             const nM = f.madre ? nivelesMap[f.madre] : 0;
+            // POSICIÓN: El círculo de unión se coloca justo debajo de los padres
             return { id: f.id, isFamily: true, level: Math.max(nP, nM) + 0.35 };
         });
 
-        const nodosPer = datos.personas.map(p => ({ 
-            ...p, isFamily: false, level: nivelesMap[p.id] || 0 
+        const nodosPer = datos.personas.map(p => ({
+            ...p, isFamily: false, level: nivelesMap[p.id] || 0
         }));
 
         nodes = [...nodosPer, ...nodosFam];
@@ -192,17 +193,19 @@
         simulation = d3.forceSimulation(nodes).velocityDecay(0.4);
 
         if (viewMode === 'free') {
-            // MODO LIBRE (Original de graph.html)
+            // MODO LIBRE (Original de graph.html anterior)
             simulation
                 .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === "marriage" ? 60 : 150).strength(1.2))
                 .force("charge", d3.forceManyBody().strength(d => d.isFamily ? -1500 : -1000))
                 .force("center", d3.forceCenter(w / 2, h / 2))
                 .force("collision", d3.forceCollide().radius(d => d.isFamily ? 50 : 100));
         } else {
-            // MODO JERÁRQUICO (Cascada agrupada)
+            // MODO JERÁRQUICO (Física precisa de graph_tree_good.html)
             const generacionHeight = 320;
             simulation
-                .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === "marriage" ? 50 : 90).strength(2.5))
+                .force("link", d3.forceLink(links).id(d => d.id)
+                    .distance(d => d.type === "marriage" ? 50 : 90)
+                    .strength(2.5))
                 .force("charge", d3.forceManyBody().strength(-5000))
                 .force("x", d3.forceX(w/2).strength(0.02))
                 .force("y", d3.forceY(d => 100 + (d.level * generacionHeight)).strength(5))
@@ -210,14 +213,15 @@
         }
 
         // Warm-up inicial
-        const iteraciones = viewMode === 'free' ? 80 : 300;
+        const iteraciones = viewMode === 'free' ? 80 : 500;
         for (let i = 0; i < iteraciones; i++) simulation.tick();
 
         const linkElements = gContainer.append("g")
             .selectAll("path")
             .data(links)
             .join("path")
-            .attr("class", d => d.type === "marriage" ? "link link-family" : "link");
+            .attr("class", d => d.type === "marriage" ? "link link-family" : "link")
+            .attr("d", d => `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`);
 
         const nodeElements = gContainer.append("g")
             .selectAll("g")
