@@ -121,6 +121,7 @@
 <script>
     let datos = { personas: [], familias: [] };
     let viewMode = 'hierarchy'; // 'free' o 'hierarchy'
+    let activeNodeId = null; // RASTREO DE NODO SELECCIONADO
     const svg = d3.select("#graph-canvas");
     const gContainer = svg.append("g");
 
@@ -164,6 +165,11 @@
         viewMode = (viewMode === 'free') ? 'hierarchy' : 'free';
         document.getElementById('view-toggle').innerText = `Vista: ${viewMode === 'free' ? 'Libre' : 'Jerárquica'}`;
         actualizarGrafo();
+
+        // RE-ENFOCAR SI HAY NODO SELECCIONADO
+        if (activeNodeId) {
+            setTimeout(() => focusNode(activeNodeId, 500), 200);
+        }
     }
 
     function actualizarGrafo() {
@@ -174,7 +180,6 @@
         const nodosFam = datos.familias.map(f => {
             const nP = f.padre ? nivelesMap[f.padre] : 0;
             const nM = f.madre ? nivelesMap[f.madre] : 0;
-            // POSICIÓN: El círculo de unión se coloca justo debajo de los padres
             return { id: f.id, isFamily: true, level: Math.max(nP, nM) + 0.35 };
         });
 
@@ -193,14 +198,12 @@
         simulation = d3.forceSimulation(nodes).velocityDecay(0.4);
 
         if (viewMode === 'free') {
-            // MODO LIBRE (Original de graph.html anterior)
             simulation
                 .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === "marriage" ? 60 : 150).strength(1.2))
                 .force("charge", d3.forceManyBody().strength(d => d.isFamily ? -1500 : -1000))
                 .force("center", d3.forceCenter(w / 2, h / 2))
                 .force("collision", d3.forceCollide().radius(d => d.isFamily ? 50 : 100));
         } else {
-            // MODO JERÁRQUICO (Física precisa de graph_tree_good.html)
             const generacionHeight = 320;
             simulation
                 .force("link", d3.forceLink(links).id(d => d.id)
@@ -212,7 +215,6 @@
                 .force("collision", d3.forceCollide().radius(d => d.isFamily ? 40 : 160));
         }
 
-        // Warm-up inicial
         const iteraciones = viewMode === 'free' ? 80 : 500;
         for (let i = 0; i < iteraciones; i++) simulation.tick();
 
@@ -255,6 +257,11 @@
             linkElements.attr("d", d => `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`);
             nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
         });
+
+        // RE-APLICAR RESALTADO SI HAY NODO ACTIVO
+        if (activeNodeId) {
+            d3.select("#node-" + activeNodeId).classed("found-node", true);
+        }
     }
 
     function dragstarted(event, d) {
@@ -270,9 +277,13 @@
     function focusNode(id, duration = 1000) {
         const targetNode = nodes.find(n => n.id === id);
         if (!targetNode) return;
+
+        activeNodeId = id; // ACTUALIZAR NODO ACTIVO
+
         simulation.alpha(0);
         const transform = d3.zoomIdentity.translate(window.innerWidth/2, window.innerHeight/2).scale(1.2).translate(-targetNode.x, -targetNode.y);
         svg.transition().duration(duration).ease(d3.easeQuadInOut).call(zoomBehavior.transform, transform).on("end", () => simulation.alpha(0.01).restart());
+
         d3.selectAll(".node-person").classed("found-node", false);
         d3.select("#node-" + id).classed("found-node", true);
         mostrarInfo(targetNode);
@@ -303,7 +314,11 @@
         document.getElementById("info-card").classList.add("active");
     }
 
-    function cerrarInfo() { document.getElementById("info-card").classList.remove("active"); }
+    function cerrarInfo() {
+        document.getElementById("info-card").classList.remove("active");
+        activeNodeId = null; // LIMPIAR NODO ACTIVO
+        d3.selectAll(".node-person").classed("found-node", false);
+    }
 
     function exportarJSON() {
         const blob = new Blob([JSON.stringify(datos, null, 2)], {type: 'application/json'});
