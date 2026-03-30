@@ -3,16 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>patrisiu.com</title>
+    <title>patrisiu.com - Projects & Portfolio</title>
+    <style>
+        body {
+            font-family: "Times New Roman", Times, serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+            color: #1a1a1a;
+            background-color: #fdfdfd;
+        }
+        header {
+            margin-bottom: 40px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin: 0;
+            font-weight: normal;
+        }
+        h2 {
+            font-size: 1.8em;
+            margin-top: 30px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+            font-weight: normal;
+            font-variant: small-caps;
+        }
+        .project {
+            margin-bottom: 25px;
+        }
+        .project-title {
+            font-weight: bold;
+            font-size: 1.2em;
+            display: block;
+        }
+        .project-description {
+            margin: 5px 0;
+            text-align: justify;
+        }
+        .links {
+            margin-top: 8px;
+            font-size: 0.95em;
+        }
+        .links a {
+            text-decoration: none;
+            color: #004499;
+            margin-right: 20px;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+        section {
+            margin-bottom: 40px;
+        }
+        footer {
+            margin-top: 60px;
+            font-size: 0.85em;
+            color: #666;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
 <header>
-    <h1>Welcome to patrisiu.com</h1>
+    <h1>Patrisiu</h1>
+    <p>Software Development and Data Visualization Projects</p>
 </header>
 
 <main>
-    <p>This is the official website of patrisiu.com</p>
-    <p>Stay tuned for updates!</p>
+    <section id="projects">
+        <h2>Research & Development Projects</h2>
+
+        <div class="project">
+            <span class="project-title">HugMeter</span>
+            <p class="project-description">
+                HugMeter is a "low-pressure" social tool designed to bridge the gap between digital communication and physical affection.
+                The application allows users to send virtual hugs and track the physical distance to their loved ones, facilitating emotional
+                connection without the demand of a full conversation. Built with a privacy-first architecture, it explores how
+                approximate location data can be leveraged to foster interpersonal closeness without compromising user anonymity.
+            </p>
+            <div class="links">
+                <a href="https://hugmeter.patrisiu.com/about/">[Project Details]</a>
+                <a href="https://hugmeter.patrisiu.com/">[Live Application]</a>
+            </div>
+        </div>
+
+        <div class="project">
+            <span class="project-title">StockMeter</span>
+            <p class="project-description">
+                StockMeter provides a streamlined interface for monitoring financial markets and stock performance.
+                The project emphasizes clear data presentation and real-time tracking for investment analysis.
+            </p>
+            <div class="links">
+                <a href="https://stockmeter.patrisiu.com/about/">[Project Details]</a>
+                <a href="https://stockmeter.patrisiu.com/">[Live Application]</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="blog">
+        <h2>Personal Blog</h2>
+        <p>Reflections on software engineering, technical challenges, and personal insights.</p>
+        <div class="links">
+            <a href="https://patrisiu.blogspot.com/">Visit Blog: patrisiu.blogspot.com</a>
+        </div>
+    </section>
 </main>
 
 <footer>
